@@ -2,6 +2,8 @@
 
 IN PROGRESS
 
-Halloran and Hunkeler (2020), Science of the Total Environment.
+Halloran and Hunkeler (under review).
 
-Python scripts from the paper. Each scenario has a different script. 
+Python scripts related to the paper. Each scenario has a different script.
+
+More info to come upon publication!
