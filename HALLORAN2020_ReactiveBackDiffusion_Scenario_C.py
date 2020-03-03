@@ -1,31 +1,28 @@
 # -*- coding: utf-8 -*-
 """
-HALLORAN2020_ReactiveBackDiffusion_Scenario_A.py
+HALLORAN2020_ReactiveBackDiffusion_Scenario_C.py
 Landon Halloran, 2020
 www.ljsh.ca 
 github.com/lhalloran
 
-Python script to process and analyse model output for Scenario A in Halloran & Hunkeler (2020) paper.
+Python script to process and analyse model output for Scenario C in Halloran & Hunkeler (2020) paper.
 
 """
 
-#%% Import necessary packages:
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.ticker import StrMethodFormatter
 from datetime import datetime
 from matplotlib.backends.backend_pdf import PdfPages
+from scipy.optimize import curve_fit
 from matplotlib.colors import LogNorm
-
 #%% 
 #################################### TO BE DEFINED BY USER #######################################
-dropFactor = 1.0/10  # Attenuation factor (<1).
 cutOffC = 0.00001    # Cut-off normalised concentration (should be >=1E-5).
-pointNumber = 5 - 1  # Observation well for analysis. Starts at 0, moving L to R (i.e., well at 100m is # 4)
+pointNumber = 4      # Observation well for analysis. Above aquitard starts at 0, moving L to R (i.e., well at 100m is # 4)
 ##################################################################################################
-
-#%% DEFINE CUJSTOM FUNCTIONS
+#%% DEFINE CUSTOM FUNCTIONS
 # text colour chooser
 def choose_colour(val,maxval):
     if np.isnan(val):
@@ -44,20 +41,20 @@ def tx_to_unitless(v,t,x):
 def to_velocity(K,epsilon,dHdx):
     return (1/epsilon)*K*dHdx
 
-#%% READ AND PRE-PROCESS DATA
-fileName = 'ScenarioA.csv'
+#%%
+
+fileName = 'ScenarioC.csv'
 theFontSize=14
 plt.rcParams["font.weight"] = "bold"
 plt.rcParams["axes.labelweight"] = "bold"
 
-nt = 211 # number of time steps
+nt = 66 # number of time steps
 nPoints = 5
 nParams = 6
 nParamsCombo = 288
 dHdx = 0.01 # horizontal hydraulic gradient 
-epsilonAquitard = 0.4 # porosity in aquitard
-epsilonAquifer = 0.35 # porosity in aquifer
-tRemove = 10
+epsilonAquitard = 0.4 # porosity in aquitard!
+epsilonAquifer = 0.35 # porosity in aquifer!
 
 dataIn = pd.read_csv(fileName, header=4)
 data = np.empty((nParamsCombo, nt, nPoints))
@@ -71,45 +68,81 @@ for i in np.arange(nParamsCombo):
     data[i,:,:] = dataIn.values[startInd:startInd+nt, nParams+1:]
     params[i,:] = dataIn.values[startInd, 1:1+nParams]
 
-tDrop = np.zeros((nParamsCombo,nPoints))-1.0 # time where C drops by dropfactor from peak
-maxC = np.zeros((nParamsCombo,nPoints))-1.0 # maximum concentration 
-for i in np.arange(nParamsCombo):
-    for j in np.arange(nPoints):
-        dataNow = data[i,:,j]
-        maxNow = np.max(dataNow)
-        if maxNow>=cutOffC:
-            maxC[i,j] = maxNow
-        else:
-            maxC[i,j] = cutOffC*0.1 # assign small value
-        
-        if params[i,0]==5E-5: # max value is basically constant over a certain period in many of of the fastest flow cases, so define as t=10 days
-            indMaxNow = 10
-        else:
-            indMaxNow = np.argmax(dataNow)
-            
-        if maxNow<cutOffC:
-            tDrop[i,j] = np.NaN # if no significant concentration is seen (i.e. down in rounding errors)
-        elif np.argmax(dataNow[indMaxNow:]<=maxNow*dropFactor) == 0:
-            tDrop[i,j] = t[-1]+1.0 # if dropFactor value is never seen, assign 200+1 years
-        else:
-            indDrop = np.argmax(dataNow[indMaxNow:]<=maxNow*dropFactor)+indMaxNow
-            # this now does linear approximation to estimate the inter-year point 
-            # at which the concentration drops below threshold...
-            C2,t2 = dataNow[indDrop],t[indDrop]
-            C1,t1 = dataNow[indDrop-1],t[indDrop-1]
-            tDropNow = t2 - 1 + (C1-maxNow*dropFactor)/(C1-C2)
-            tDrop[i,j] = tDropNow - t[indMaxNow] # tDrop is now time since max
-nvatt=tDrop-tDrop
+#%% some general plotting parameters
+thefigsize=10,10
 
-thefigsize=10,10 # general plotting parameters
-xPoint = np.remainder(pointNumber,5)*20 + 20 # x distance of points
+#%% initial plots of data 
+xloc=np.arange(0,101,20)
+
+plt.figure()
+for i in np.arange(nParamsCombo):
+    clrnow=(0.0,i/nParamsCombo,1-i/nParamsCombo,0.25)
+    plt.plot(xloc,np.append(np.array(1),data[i,-1,:]),c=clrnow)
+plt.title('Concentration at 1000 years')
+plt.xlabel('distance from source (m)')
+
+plt.figure()
+for i in np.arange(nParamsCombo):
+    clrnow=(0.0,i/nParamsCombo,1-i/nParamsCombo,0.25)
+    plt.plot(t,data[i,:,4],c=clrnow)
+plt.title('Concentration at 100 m')
+plt.xlabel('time (years)')
+#%% determine spatial dependence at equilibrium (t = 1000 years)
+def expdec(x, b):
+    return np.exp(-x/b)
+
+# Exponential decay parameter b (1 value per model run):
+equilExpParam=np.zeros((nParamsCombo))-1.0
+for i in np.arange(nParamsCombo):
+    datanow = np.append(np.array(1),data[i,-1,:])
+    pOpt, pCov = curve_fit(expdec, xloc, datanow, p0=(20))
+    equilExpParam[i] = pOpt
+
+# Concentrations at equilibrium (at all 5 points):
+#CatEquil=np.zeros((nParamsCombo,nPoints))
+#for i in np.arange(nParamsCombo):
+#    datanow = data[i,-1,:]
+#    CatEquil[i,:] = datanow
+
+#%% Detm
+
+def delayedExpRise(t, a, b, t0):
+    return np.max([0,a*(1 - np.exp(-(t-t0)/b))])
+delayedExpRise_vec = np.vectorize(delayedExpRise) #vectorize so you can use func with array
+def delayedExpRise_vec_self(x,a,b,t0):
+  y = np.zeros(x.shape)
+  for i in range(len(y)):
+    y[i]=delayedExpRise(x[i],a,b,t0)
+  return y
+
+temporalParams=np.zeros((nParamsCombo,nPoints,3))
+for n in np.arange(nPoints):
+    print("Processing observation well #"+str(n)+'...')
+    for i in np.arange(nParamsCombo):
+        datanow = data[i,:,n]
+        try:
+            if np.max(datanow)>cutOffC:
+                pOpt, pCov = curve_fit(delayedExpRise_vec_self, t, datanow, p0=(np.max(datanow),1,15),bounds=([np.max(datanow)*0.99,0.1,0.1],[1,1E5,60]))
+                #print(str(pOpt))
+                if pOpt[1]<1E4:
+                    temporalParams[i,n,:] = pOpt
+                else:
+                    temporalParams[i,n,:] = [0,np.NaN,np.NaN]
+            else:
+                temporalParams[i,n,:] = [0,np.NaN,np.NaN]
+        except RuntimeError:
+            print("# Error - curve_fit failed @ n="+str(n)+", i="+str(i))
+            temporalParams[i,n,:] = [0,np.NaN,np.NaN]#3*[np.NaN]
+print('# Fits complete.')    
+
+xPoint = np.remainder(pointNumber,5)*20 + 20
 
 #%% prep for plots
 nParamUnique=[]
 i=0
 for row in params.transpose():
     nParamUnique.append(np.unique(row).size)
-    print(paramNames[i]+' has '+str(nParamUnique[i])+' unique values')
+    print('# '+paramNames[i]+' has '+str(nParamUnique[i])+' unique values')
     i = i+1
 
 indsOrder = np.array([2,3,0,4,5])   # indices of params for x axis, y-axis, nx plots, ny plots, param for each plot
@@ -123,85 +156,26 @@ fileOutName='out/'+fileName+'_OUT_'+dtNow+'.pdf'
 pp = PdfPages(fileOutName)
 
 # begin loop
-for lastParamVal in valsExtraParam: # here, this should be retardation factor
+for lastParamVal in valsExtraParam: # here, this should be relaxation factor
     fig=plt.figure(figsize=(thefigsize))
     plt.plot()
     fig.patch.set_visible(False)
     plt.axis('off')
-    textForFig = fileOutName+ '\n' + '$f_{re} =$ ' + str(lastParamVal) +'\n' + 'point # = ' +str(pointNumber+1) +' (@ '+str(xPoint)+' m)\n'+'drop factor = ' + str(dropFactor) +'\n cutOffC = '+str(cutOffC)+'\n\n order of figures:\n'+'time (years) for attenuation after peak \n peak value (mol/m$^3$) \n n pore volumes for attenuation after peak'
+    textForFig = fileOutName+ '\n' + '$f_{re} =$ ' + str(lastParamVal) +'\n' + 'point # = ' +str(pointNumber+1) +' (@ '+str(xPoint)+' m)\n'+'\n\n order of figures:\n'+'equilibrium concentration \n value of $b$ parameter (years) \n value of $b$ in terms of pore volumes \n x_0 for steady-state dcay with length'
     plt.text(0,0,textForFig,multialignment='center',ha='center')
     pp.savefig(fig)
     plt.close()
-    
-    # make plot of tDrop vs. 4 parameters
-    tMin,tMax = 0,t[-1]-tRemove
-    fig, axes = plt.subplots(nx, ny,figsize=(thefigsize))
-    
-    for ix in np.arange(nx):
-        valix = np.unique(params[:,indsOrder[2]])[ix]
-        for iy in np.arange(ny):
-            valiy = np.unique(params[:,indsOrder[3]])[iy]
-            indsNow = np.where(np.logical_and(np.logical_and(params[:,indsOrder[2]]==valix,params[:,indsOrder[3]]==valiy),
-                                              params[:,indsOrder[4]]==lastParamVal))
-            dataNow = tDrop[indsNow,pointNumber]
-            yNow=params[indsNow,indsOrder[0]]
-            xNow=params[indsNow,indsOrder[1]]
-            sizeNow=np.array([nParamUnique[indsOrder[0]],nParamUnique[indsOrder[1]]])
-            if ny==1:
-                plt.sca(axes[ix])
-                axNow=axes[ix]
-            else:
-                plt.sca(axes[ix,iy])
-                axNow=axes[ix,iy]
-            axNow.imshow(dataNow.reshape(sizeNow),vmax=tMax,vmin=tMin,cmap='cividis')
-            xTickLabels = [ '{:.2e}'.format(l) for l in xNow[0,0:np.unique(params[:,indsOrder[0]]).size] ]
-            yTickLabels = yNow[0,0::np.unique(params[:,indsOrder[1]]).size]
-            plt.gca().xaxis.set_major_formatter(StrMethodFormatter('{x:,.2f}'))
-            if ix==0: # ix and iy are backwards, I think....
-                titlestr=paramNames[indsOrder[3]]+' = ' +str(valiy)
-                plt.title(titlestr,fontsize=theFontSize,weight='bold')
-            if iy==ny-1:
-                titlestr=paramNames[indsOrder[2]]+' = ' +str(valix)
-                axNow.yaxis.set_label_position("right")
-                plt.ylabel(titlestr,rotation=270,fontsize=theFontSize,ha='center', va='bottom')
-            if ix==nx-1:
-                plt.xticks(np.arange(np.unique(params[:,indsOrder[0]]).size), xTickLabels,rotation=15)
-            else:
-                plt.xticks(np.arange(np.unique(params[:,indsOrder[0]]).size),[])
-            if iy==0:
-                plt.yticks(np.arange(np.unique(params[:,indsOrder[1]]).size), yTickLabels)
-            else:
-                plt.yticks(np.arange(np.unique(params[:,indsOrder[1]]).size), [])            
-            # add value labels to plot
-            x_positions = np.arange(nParamUnique[indsOrder[0]])
-            y_positions = np.arange(nParamUnique[indsOrder[1]])
-            for y_index, y in enumerate(y_positions):
-                for x_index, x in enumerate(x_positions):
-                    tNow=dataNow.reshape(sizeNow)[y_index,x_index]
-                    if tNow>t[-1]-tRemove:
-                        label='>'+str(int(t[-1]-tRemove)) # for when attenuation takes longer than simulation results
-                    elif np.isnan(tNow):
-                        label='*' # for when concentration never exceeds cutoff
-                    else:
-                        label = "{:2.2f}".format(tNow)
-                    text_x = x
-                    text_y = y
-                    thecolour=choose_colour(tNow,t[-1]-tRemove)
-                    axNow.text(text_x, text_y, label, color=thecolour, ha='center', va='center', name='ITC Avant Garde Gothic',rotation=45)
-    fig.text(0.5, 0.05, paramNames[indsOrder[1]], ha='center',fontsize=theFontSize)
-    fig.text(0.05, 0.5, paramNames[indsOrder[0]], ha='center',fontsize=theFontSize,rotation='vertical')    
-    pp.savefig(fig)
-    
+
     # make plot of maximum concentration value:
-    CMin,CMax = np.min(maxC[:,pointNumber]),np.max(maxC[:,pointNumber])
-    fig, axes = plt.subplots(nx, ny,figsize=(thefigsize))   
+    CMin,CMax = 0,1
+    fig, axes = plt.subplots(nx, ny,figsize=(thefigsize)) 
     for ix in np.arange(nx):
         valix = np.unique(params[:,indsOrder[2]])[ix]
         for iy in np.arange(ny):
             valiy = np.unique(params[:,indsOrder[3]])[iy]
             indsNow = np.where(np.logical_and(np.logical_and(params[:,indsOrder[2]]==valix,params[:,indsOrder[3]]==valiy),
                                               params[:,indsOrder[4]]==lastParamVal))
-            dataNow = maxC[indsNow,pointNumber]
+            dataNow = temporalParams[indsNow,pointNumber,0]
             yNow=params[indsNow,indsOrder[0]]
             xNow=params[indsNow,indsOrder[1]]
             sizeNow=np.array([nParamUnique[indsOrder[0]],nParamUnique[indsOrder[1]]])
@@ -238,37 +212,29 @@ for lastParamVal in valsExtraParam: # here, this should be retardation factor
                     CNow=dataNow.reshape(sizeNow)[y_index,x_index]
                     if CNow>1:
                         label='1.000' 
-                    elif CNow<cutOffC:
-                        label='*' # for when concentration never exceeds cutoff
+                    elif CNow<0.0005:
+                        label='0.000' # for when concentration never exceeds cutoff
                     else:
                         label = "{:2.3f}".format(CNow)
                     text_x = x
                     text_y = y
-                    thecolour=choose_colour(CNow,CMax)
+                    thecolour=choose_colour(CNow,1)
                     axNow.text(text_x, text_y, label, color=thecolour, ha='center', va='center', name='ITC Avant Garde Gothic',rotation=45)
     fig.text(0.5, 0.05, paramNames[indsOrder[1]], ha='center',fontsize=theFontSize)
     fig.text(0.05, 0.5, paramNames[indsOrder[0]], ha='center',fontsize=theFontSize,rotation='vertical')
     pp.savefig(fig)
 
-    # make plot of n volumes (normalised time) vs. 4 parameters
-    nParamUnique=[]
-    i=0
-    for row in params.transpose():
-        nParamUnique.append(np.unique(row).size)
-        print(paramNames[i]+' has '+str(nParamUnique[i])+' unique values')
-        i = i+1
-    tnMin,tnMax = min(tx_to_unitless(365*24*3600*to_velocity(params[:,indsOrder[2]],epsilonAquifer,dHdx),tDrop[:,pointNumber],xPoint)),max(tx_to_unitless(365*24*3600*to_velocity(params[:,indsOrder[2]],epsilonAquifer,dHdx),tDrop[:,pointNumber],xPoint))
-    fig, axes = plt.subplots(nx, ny,figsize=(thefigsize))    
+    #make plot of b parameter vs. 4 parameters
+    bMin,bMax = 0,1000
+    fig, axes = plt.subplots(nx, ny,figsize=(thefigsize))
     for ix in np.arange(nx):
         valix = np.unique(params[:,indsOrder[2]])[ix]
         for iy in np.arange(ny):
             valiy = np.unique(params[:,indsOrder[3]])[iy]
-            #print(str(valix)+','+str(valiy))
             indsNow = np.where(np.logical_and(np.logical_and(params[:,indsOrder[2]]==valix,params[:,indsOrder[3]]==valiy),
                                               params[:,indsOrder[4]]==lastParamVal))
-            dataNowtDrop = tDrop[indsNow,pointNumber]
-            dataNow = tx_to_unitless(365*24*3600*to_velocity(valix,epsilonAquifer,dHdx),dataNowtDrop,xPoint) # option convert to n volumes
-            nvatt[indsNow,pointNumber] = dataNow
+            dataNow = temporalParams[indsNow,pointNumber,1]
+            dataNow[temporalParams[indsNow,pointNumber,0]<0.0001]=np.NaN
             yNow=params[indsNow,indsOrder[0]]
             xNow=params[indsNow,indsOrder[1]]
             sizeNow=np.array([nParamUnique[indsOrder[0]],nParamUnique[indsOrder[1]]])
@@ -278,11 +244,11 @@ for lastParamVal in valsExtraParam: # here, this should be retardation factor
             else:
                 plt.sca(axes[ix,iy])
                 axNow=axes[ix,iy]
-            axNow.imshow(dataNow.reshape(sizeNow),vmax=tnMax,vmin=tnMin,cmap='cividis',norm=LogNorm(vmin=tnMin, vmax=tnMax))
+            axNow.imshow(dataNow.reshape(sizeNow),vmax=bMax,vmin=bMin,cmap='cividis')
             xTickLabels = [ '{:.2e}'.format(l) for l in xNow[0,0:np.unique(params[:,indsOrder[0]]).size] ]
             yTickLabels = yNow[0,0::np.unique(params[:,indsOrder[1]]).size]
             plt.gca().xaxis.set_major_formatter(StrMethodFormatter('{x:,.2f}'))
-            if ix==0:
+            if ix==0: # ix and iy are backwards, I think....
                 titlestr=paramNames[indsOrder[3]]+' = ' +str(valiy)
                 plt.title(titlestr,fontsize=theFontSize,weight='bold')
             if iy==ny-1:
@@ -302,142 +268,241 @@ for lastParamVal in valsExtraParam: # here, this should be retardation factor
             y_positions = np.arange(nParamUnique[indsOrder[1]])
             for y_index, y in enumerate(y_positions):
                 for x_index, x in enumerate(x_positions):
-                    tnNow = dataNow.reshape(sizeNow)[y_index,x_index]
-                    if dataNowtDrop.reshape(sizeNow)[y_index,x_index]>t[-1]-tRemove:
-                        label='>'+"{:2.2f}".format(tnNow) # for when attenuation takes longer than simulation results
-                    elif np.isnan(tnNow):
+                    bNow=dataNow.reshape(sizeNow)[y_index,x_index]
+                    if bNow>bMax:
+                        label='>'+str(int(bMax)) # for when attenuation takes longer than simulation results
+                    elif np.isnan(bNow):
                         label='*' # for when concentration never exceeds cutoff
                     else:
-                        label = "{:2.2f}".format(tnNow)
+                        label = "{:2.2f}".format(bNow)
                     text_x = x
                     text_y = y
-                    thecolour=choose_colour(np.log(tnNow/tnMin),np.log(tnMax))
+                    thecolour=choose_colour(bNow,bMax)
+                    axNow.text(text_x, text_y, label, color=thecolour, ha='center', va='center', name='ITC Avant Garde Gothic',rotation=45)
+    fig.text(0.5, 0.05, paramNames[indsOrder[1]], ha='center',fontsize=theFontSize)
+    fig.text(0.05, 0.5, paramNames[indsOrder[0]], ha='center',fontsize=theFontSize,rotation='vertical')    
+    pp.savefig(fig)
+    
+    # plot of b parameter normalised to n volumes (normalised time) vs. 4 parameters    
+    nParamUnique=[]
+    i=0
+    for row in params.transpose():
+        nParamUnique.append(np.unique(row).size)
+        #print(paramNames[i]+' has '+str(nParamUnique[i])+' unique values')
+        i = i+1
+    bnMin,bnMax = max(0.01,min(tx_to_unitless(365*24*3600*to_velocity(params[:,indsOrder[2]],epsilonAquifer,dHdx),temporalParams[:,pointNumber,1],xPoint))),max(tx_to_unitless(365*24*3600*to_velocity(params[:,indsOrder[2]],epsilonAquifer,dHdx),temporalParams[:,pointNumber,1],xPoint))
+    fig, axes = plt.subplots(nx, ny,figsize=(thefigsize))    
+    for ix in np.arange(nx):
+        valix = np.unique(params[:,indsOrder[2]])[ix]
+        for iy in np.arange(ny):
+            valiy = np.unique(params[:,indsOrder[3]])[iy]
+            indsNow = np.where(np.logical_and(np.logical_and(params[:,indsOrder[2]]==valix,params[:,indsOrder[3]]==valiy),
+                                              params[:,indsOrder[4]]==lastParamVal))
+            dataNowbDrop = temporalParams[indsNow,pointNumber,1]
+            dataNow = tx_to_unitless(365*24*3600*to_velocity(valix,epsilonAquifer,dHdx),dataNowbDrop,xPoint) # option convert to n volumes
+            dataNow[temporalParams[indsNow,pointNumber,0]<0.0001]=np.NaN
+            yNow=params[indsNow,indsOrder[0]]
+            xNow=params[indsNow,indsOrder[1]]
+            sizeNow=np.array([nParamUnique[indsOrder[0]],nParamUnique[indsOrder[1]]])
+            if ny==1:
+                plt.sca(axes[ix])
+                axNow=axes[ix]
+            else:
+                plt.sca(axes[ix,iy])
+                axNow=axes[ix,iy]
+            axNow.imshow(dataNow.reshape(sizeNow),vmax=bnMax,vmin=bnMin,cmap='cividis',norm=LogNorm(vmin=bnMin, vmax=bnMax))
+            xTickLabels = [ '{:.2e}'.format(l) for l in xNow[0,0:np.unique(params[:,indsOrder[0]]).size] ]
+            yTickLabels = yNow[0,0::np.unique(params[:,indsOrder[1]]).size]
+            plt.gca().xaxis.set_major_formatter(StrMethodFormatter('{x:,.2f}'))
+            if ix==0: # ix and iy swapped
+                titlestr=paramNames[indsOrder[3]]+' = ' +str(valiy)
+                plt.title(titlestr,fontsize=theFontSize,weight='bold')
+            if iy==ny-1:
+                titlestr=paramNames[indsOrder[2]]+' = ' +str(valix)
+                axNow.yaxis.set_label_position("right")
+                plt.ylabel(titlestr,rotation=270,fontsize=theFontSize,ha='center', va='bottom')
+            if ix==nx-1:
+                plt.xticks(np.arange(np.unique(params[:,indsOrder[0]]).size), xTickLabels,rotation=15)
+            else:
+                plt.xticks(np.arange(np.unique(params[:,indsOrder[0]]).size),[])
+            if iy==0:
+                plt.yticks(np.arange(np.unique(params[:,indsOrder[1]]).size), yTickLabels)
+            else:
+                plt.yticks(np.arange(np.unique(params[:,indsOrder[1]]).size), [])            
+            # add value labels to plot
+            x_positions = np.arange(nParamUnique[indsOrder[0]])
+            y_positions = np.arange(nParamUnique[indsOrder[1]])
+            for y_index, y in enumerate(y_positions):
+                for x_index, x in enumerate(x_positions):
+                    bnNow=dataNow.reshape(sizeNow)[y_index,x_index]
+                    if bnNow>bnMax:
+                        label='>'+str(int(bnMax)) # for when attenuation takes longer than simulation results
+                    elif np.isnan(bnNow):
+                        label='*' # for when concentration never exceeds cutoff
+                    else:
+                        label = "{:2.2f}".format(bnNow)
+                    text_x = x
+                    text_y = y
+                    thecolour=choose_colour(np.log(bnNow/bnMin),np.log(bnMax))
                     axNow.text(text_x, text_y, label, color=thecolour, ha='center', va='center', name='ITC Avant Garde Gothic',rotation=45)
     fig.text(0.5, 0.05, paramNames[indsOrder[1]], ha='center',fontsize=theFontSize)
     fig.text(0.05, 0.5, paramNames[indsOrder[0]], ha='center',fontsize=theFontSize,rotation='vertical')
     pp.savefig(fig)
-#%% 
-fig=plt.figure(figsize=(thefigsize))
-plt.plot()
-fig.patch.set_visible(False)
-plt.axis('off')
-textForFig = fileOutName+ '\n Plots involving combined parameters $Pi_1$, $Pi_2$, and $\eta$...'
-plt.text(0,0,textForFig,multialignment='center',ha='center')
-pp.savefig(fig)
-plt.close()
+    
+    # make plot of spatial decay parameter (x_0) for all (measure of plume length at equilibirum)   
+    x0Min,x0Max = min(equilExpParam),max(equilExpParam)
+    fig, axes = plt.subplots(nx, ny,figsize=(thefigsize))
+    for ix in np.arange(nx):
+        valix = np.unique(params[:,indsOrder[2]])[ix]
+        for iy in np.arange(ny):
+            valiy = np.unique(params[:,indsOrder[3]])[iy]
+            indsNow = np.where(np.logical_and(np.logical_and(params[:,indsOrder[2]]==valix,params[:,indsOrder[3]]==valiy),
+                                              params[:,indsOrder[4]]==lastParamVal))
+            dataNow = equilExpParam[indsNow] # option convert to n volumes
+            yNow=params[indsNow,indsOrder[0]]
+            xNow=params[indsNow,indsOrder[1]]
+            sizeNow=np.array([nParamUnique[indsOrder[0]],nParamUnique[indsOrder[1]]])
+            if ny==1:
+                plt.sca(axes[ix])
+                axNow=axes[ix]
+            else:
+                plt.sca(axes[ix,iy])
+                axNow=axes[ix,iy]
+            axNow.imshow(dataNow.reshape(sizeNow),vmax=x0Max,vmin=x0Min,cmap='inferno',norm=LogNorm(vmin=x0Min, vmax=x0Max))
+            xTickLabels = [ '{:.2e}'.format(l) for l in xNow[0,0:np.unique(params[:,indsOrder[0]]).size] ]
+            yTickLabels = yNow[0,0::np.unique(params[:,indsOrder[1]]).size]
+            plt.gca().xaxis.set_major_formatter(StrMethodFormatter('{x:,.2f}'))
+            if ix==0: # ix and iy swapped
+                titlestr=paramNames[indsOrder[3]]+' = ' +str(valiy)
+                plt.title(titlestr,fontsize=theFontSize,weight='bold')
+            if iy==ny-1:
+                titlestr=paramNames[indsOrder[2]]+' = ' +str(valix)
+
+                axNow.yaxis.set_label_position("right")
+
+                plt.ylabel(titlestr,rotation=270,fontsize=theFontSize,ha='center', va='bottom')
+            if ix==nx-1:
+
+                plt.xticks(np.arange(np.unique(params[:,indsOrder[0]]).size), xTickLabels,rotation=15)
+            else:
+                plt.xticks(np.arange(np.unique(params[:,indsOrder[0]]).size),[])
+            if iy==0:
+
+                plt.yticks(np.arange(np.unique(params[:,indsOrder[1]]).size), yTickLabels)
+            else:
+                plt.yticks(np.arange(np.unique(params[:,indsOrder[1]]).size), [])            
+            # add value labels to plot
+            x_positions = np.arange(nParamUnique[indsOrder[0]])
+            y_positions = np.arange(nParamUnique[indsOrder[1]])
+            for y_index, y in enumerate(y_positions):
+                for x_index, x in enumerate(x_positions):
+                    x0Now=dataNow.reshape(sizeNow)[y_index,x_index]
+                    if x0Now>x0Max:
+                        label='>'+str(int(x0Max)) # for when attenuation takes longer than simulation results
+                    elif np.isnan(bnNow):
+                        label='*' # for when concentration never exceeds cutoff
+                    else:
+                        label = "{:2.1f}".format(x0Now)
+                    text_x = x
+                    text_y = y
+                    thecolour=choose_colour(np.log(x0Now/x0Min),np.log(x0Max))
+                    axNow.text(text_x, text_y, label, color=thecolour, ha='center', va='center', name='ITC Avant Garde Gothic',rotation=45)
+    fig.text(0.5, 0.05, paramNames[indsOrder[1]], ha='center',fontsize=theFontSize)
+    fig.text(0.05, 0.5, paramNames[indsOrder[0]], ha='center',fontsize=theFontSize,rotation='vertical')
+    pp.savefig(fig)
 
 #%% plots vs combined parameters
-tDropMasked = np.ma.masked_where(tDrop==201,tDrop) 
-nDrop = tx_to_unitless(365*24*3600*to_velocity(params[:,0],epsilonAquifer,dHdx),tDropMasked[:,pointNumber],xPoint)
-
-# pis are from application of Buckingham Pi Theorem:
-pi1=params[:,4]*np.sqrt(params[:,2]/(params[:,3]*epsilonAquitard**(4/3)))
-pi2=params[:,0]*np.sqrt(params[:,3]*epsilonAquitard**(4/3))/params[:,2]**(3/2)
-
 alpher=0.6
-nvatt_masked = np.ma.masked_where(tDrop==201,nvatt)
 
-#%% n_v,att vs. Pis 
+#%% x0 vs. pis
 fig = plt.figure(figsize=(12,6))
-ylimNow=[0.1,100]
-legendNow = ['$z_{a}=1$m, $K_{a}=2$x$10^{-6}$ m/s','$z_{a}=1$m, $K_{a}=1$x$10^{-5}$ m/s','$z_{a}=1$m, $K_{a}=5$x$10^{-5}$ m/s',
-             '$z_{a}=0.2$m, $K_{a}=2$x$10^{-6}$ m/s','$z_{a}=0.2$m, $K_{a}=1$x$10^{-5}$ m/s','$z_{a}=0.2$m, $K_{a}=5$x$10^{-5}$ m/s',
-             '$z_{a}=5$m, $K_{a}=2$x$10^{-6}$ m/s','$z_{a}=5$m, $K_{a}=1$x$10^{-5}$ m/s','$z_{a}=5$m, $K_{a}=5$x$10^{-5}$ m/s']
-
-# nvatt vs. Pi1
-pltNow=plt.subplot(1,2,1)
-loopNow=zip(np.arange(0,288,32),['gv','go','g^','bv','bo','b^','rv','ro','r^'])
-for i,c in loopNow:
-    plt.loglog(pi1[i:i+32],nvatt_masked[i:i+32,pointNumber],c,alpha=alpher)#
-pltNow.grid(True,which="both",ls=":",linewidth=0.5,c='grey')
-plt.xlabel('$\Pi_1$ [-]',fontsize=theFontSize)
-plt.ylabel('$n_{v,att}$',fontsize=theFontSize)
-plt.ylim(ylimNow)
-plt.legend(legendNow,fontsize=theFontSize-6)
-
-# nvatt vs. Pi2
-pltNow = plt.subplot(1,2,2)
-loopNow=zip(np.arange(0,288,32),['gv','go','g^','bv','bo','b^','rv','ro','r^'])
-for i,c in loopNow:
-    plt.loglog(pi2[i:i+32],nvatt_masked[i:i+32,pointNumber],c,alpha=alpher)#
-pltNow.grid(True,which="both",ls=":",linewidth=0.5,c='grey')
-plt.xlabel('$\Pi_2$ [-]',fontsize=theFontSize)
-plt.ylabel('$n_{v,att}$',fontsize=theFontSize)
-plt.ylim(ylimNow)
-
-pp.savefig(fig)
-#%% C'max vs. Pis
-fig = plt.figure(figsize=(12,6))
-
 ylimNow=[0,1]
 legendNow = ['$z_{a}=1$m, $K_{a}=2$x$10^{-6}$ m/s','$z_{a}=1$m, $K_{a}=1$x$10^{-5}$ m/s','$z_{a}=1$m, $K_{a}=5$x$10^{-5}$ m/s',
              '$z_{a}=0.2$m, $K_{a}=2$x$10^{-6}$ m/s','$z_{a}=0.2$m, $K_{a}=1$x$10^{-5}$ m/s','$z_{a}=0.2$m, $K_{a}=5$x$10^{-5}$ m/s',
              '$z_{a}=5$m, $K_{a}=2$x$10^{-6}$ m/s','$z_{a}=5$m, $K_{a}=1$x$10^{-5}$ m/s','$z_{a}=5$m, $K_{a}=5$x$10^{-5}$ m/s']
 
-# nvatt vs. Pi1
-pltNow=plt.subplot(1,2,1)
-loopNow=zip(np.arange(0,288,32),['gv','go','g^','bv','bo','b^','rv','ro','r^'])
-for i,c in loopNow:
-    plt.semilogx(pi1[i:i+32],maxC[i:i+32,pointNumber],c,alpha=alpher)#
-pltNow.grid(True,which="both",ls=":",linewidth=0.5,c='grey')
-plt.xlabel('$\Pi_1$ [-]',fontsize=theFontSize)
-plt.ylabel('$C\'_{max}$',fontsize=theFontSize)
-plt.ylim(ylimNow)
-plt.legend(legendNow,fontsize=theFontSize-6)
+# pis are from application of Buckingham Pi Theorem:
+pi1=params[:,4]*np.sqrt(params[:,2]/(params[:,3]*epsilonAquitard**(4/3)))
+pi2=params[:,0]*np.sqrt(params[:,3]*epsilonAquitard**(4/3))/params[:,2]**(3/2)
 
-# nvatt vs. Pi2
-pltNow = plt.subplot(1,2,2)
-loopNow=zip(np.arange(0,288,32),['gv','go','g^','bv','bo','b^','rv','ro','r^'])
-for i,c in loopNow:
-    plt.semilogx(pi2[i:i+32],maxC[i:i+32,pointNumber],c,alpha=alpher)#
-pltNow.grid(True,which="both",ls=":",linewidth=0.5,c='grey')
-plt.xlabel('$\Pi_2$ [-]',fontsize=theFontSize)
-plt.ylabel('$C\'_{max}$',fontsize=theFontSize)
-plt.ylim(ylimNow)
-
-pp.savefig(fig)
-#%% C'max vs. n_v,att
-fig = plt.figure(figsize=(6,6))
-pltNow=plt.subplot(1,1,1)
-loopNow=zip(np.arange(0,288,32),['gv','go','g^','bv','bo','b^','rv','ro','r^'])
-for i,c in loopNow:
-    plt.semilogx(nvatt_masked[i:i+32,pointNumber],maxC[i:i+32,pointNumber],c,alpha=alpher)#
-plt.xlabel('$n_{v,att}$',fontsize=theFontSize)
-plt.ylabel('$C\'_{max}$',fontsize=theFontSize)
-plt.ylim([0,1])
-plt.xlim([0.1,100])
-pltNow.grid(True,which="both",ls=":",linewidth=0.5,c='grey')
-#plt.legend(['1 m','0.2 m','5 m'])
-legendNow = ['$z_{a}=1$m, $K_{a}=2$x$10^{-6}$ m/s','$z_{a}=1$m, $K_{a}=1$x$10^{-5}$ m/s','$z_{a}=1$m, $K_{a}=5$x$10^{-5}$ m/s',
-             '$z_{a}=0.2$m, $K_{a}=2$x$10^{-6}$ m/s','$z_{a}=0.2$m, $K_{a}=1$x$10^{-5}$ m/s','$z_{a}=0.2$m, $K_{a}=5$x$10^{-5}$ m/s',
-             '$z_{a}=5$m, $K_{a}=2$x$10^{-6}$ m/s','$z_{a}=5$m, $K_{a}=1$x$10^{-5}$ m/s','$z_{a}=5$m, $K_{a}=5$x$10^{-5}$ m/s']
-plt.legend(legendNow,fontsize=theFontSize-6)
-
-pp.savefig(fig)
-#%% ETA PARAMETER
-# n_v,att and C'max vs eta
-
-eta = np.sqrt(params[:,3]*params[:,2]*epsilonAquitard**(4/3))/(params[:,0]*params[:,4])
-
-fig = plt.figure(figsize=(12,6))
+# x0 vs. pi1
 pltNow=plt.subplot(1,2,1)
 loopNow=zip(np.arange(0,nParamsCombo,32),['gv','go','g^','bv','bo','b^','rv','ro','r^'])
 for i,c in loopNow:
-    plt.loglog(eta[i:i+32],nvatt_masked[i:i+32,pointNumber],c,alpha=alpher)#
+    plt.loglog(pi1[i:i+32],equilExpParam[i:i+32],c,alpha=alpher)#
+pltNow.grid(True,which="both",ls=":",linewidth=0.5,c='grey')
+plt.ylabel('$x_0$ [m]',fontsize=theFontSize)
+plt.xlabel('$\Pi_1$ [-]',fontsize=theFontSize)
+#plt.legend(['1 m','0.2 m','5 m'])
+
+# x0 vs. pi2
+pltNow=plt.subplot(1,2,2)
+loopNow=zip(np.arange(0,nParamsCombo,32),['gv','go','g^','bv','bo','b^','rv','ro','r^'])
+for i,c in loopNow:
+    plt.loglog(pi2[i:i+32],equilExpParam[i:i+32],c,alpha=alpher)#
+pltNow.grid(True,which="both",ls=":",linewidth=0.5,c='grey')
+#plt.ylabel('$x_0$ [m]',fontsize=theFontSize)
+plt.xlabel('$\Pi_2$ [-]',fontsize=theFontSize)
+
+pp.savefig(fig)
+#%% C'_equil vs. pis
+Cequil = temporalParams[:,pointNumber,0]
+fig = plt.figure(figsize=(12,6))
+
+# x0 vs. pi1
+pltNow=plt.subplot(1,2,1)
+loopNow=zip(np.arange(0,nParamsCombo,32),['gv','go','g^','bv','bo','b^','rv','ro','r^'])
+for i,c in loopNow:
+    plt.semilogx(pi1[i:i+32],Cequil[i:i+32],c,alpha=alpher)#
+pltNow.grid(True,which="both",ls=":",linewidth=0.5,c='grey')
+plt.ylabel('$C\'_{eq}$',fontsize=theFontSize)
+plt.xlabel('$\Pi_1$ [-]',fontsize=theFontSize)
+#plt.legend(['1 m','0.2 m','5 m'])
+
+# x0 vs. pi2
+pltNow=plt.subplot(1,2,2)
+loopNow=zip(np.arange(0,nParamsCombo,32),['gv','go','g^','bv','bo','b^','rv','ro','r^'])
+for i,c in loopNow:
+    plt.semilogx(pi2[i:i+32],Cequil[i:i+32],c,alpha=alpher)# 
+pltNow.grid(True,which="both",ls=":",linewidth=0.5,c='grey')
+#plt.ylabel('$x_0$ [m]',fontsize=theFontSize)
+plt.xlabel('$\Pi_2$ [-]',fontsize=theFontSize)
+
+pp.savefig(fig)
+#%% x0 & C'eq vs. eta
+eta = np.sqrt(params[:,3]*params[:,2]*epsilonAquitard**(4/3))/(params[:,0]*params[:,4])
+
+xlimNow=[3.5E-3,3.5E2]
+fig = plt.figure(figsize=(12,6))
+pltNow=plt.subplot(1,2,1)
+loopNow=zip(np.arange(0,nParamsCombo,32),['gv','go','g^','bv','bo','b^','rv','ro','r^'])
+plt.semilogx(np.logspace(-3,3,200),44*np.logspace(-3,3,200)**-1,'k-',alpha=alpher) # this is the lower limit line
+for i,c in loopNow:
+    #plt.semilogx(chi[i:i+32],nvatt_masked[i:i+32,pointNumber],c,alpha=alpher)#
+    #plt.semilogx(DHparam[i:i+32],Cequil[i:i+32],c,alpha=alpher)#
+    plt.loglog(eta[i:i+32],equilExpParam[i:i+32],c,alpha=alpher)#
+plt.xlim(xlimNow)
+plt.ylim([3E-1,3E4]) # this is for the publication - not general.
 pltNow.grid(True,which="both",ls=":",linewidth=0.5,c='grey')
 plt.xlabel('$\eta$ $[m^{-1}]$',fontsize=theFontSize)
-plt.ylabel('$n_{v,att}$',fontsize=theFontSize)
+#plt.ylabel('$C\'_{eq}$ [-]',fontsize=theFontSize)
+plt.ylabel('$x_0$ [m]',fontsize=theFontSize)
 
 pltNow=plt.subplot(1,2,2)
 loopNow=zip(np.arange(0,nParamsCombo,32),['gv','go','g^','bv','bo','b^','rv','ro','r^'])
 for i,c in loopNow:
-    plt.semilogx(eta[i:i+32],maxC[i:i+32,pointNumber],c,alpha=alpher)#
+    #plt.semilogx(chi[i:i+32],nvatt_masked[i:i+32,pointNumber],c,alpha=alpher)#
+    plt.semilogx(eta[i:i+32],Cequil[i:i+32],c,alpha=alpher)#
+    #plt.loglog(DHparam[i:i+32],equilExpParam[i:i+32],c,alpha=alpher)#
+plt.xlim(xlimNow)
 pltNow.grid(True,which="both",ls=":",linewidth=0.5,c='grey')
 plt.xlabel('$\eta$ $[m^{-1}]$',fontsize=theFontSize)
-plt.ylabel('$C\'_{max}$',fontsize=theFontSize)
+plt.ylabel('$C\'_{eq}$',fontsize=theFontSize)
+#plt.ylabel('$x_0$ [m]',fontsize=theFontSize)
 
 pp.savefig(fig)
-#%% ...and we're done!
+
+#%%
 pp.close()
-print('Figures successfully written to file: '+fileOutName)
+print('# Figures successfully written to file: '+fileOutName)
 plt.close('all')

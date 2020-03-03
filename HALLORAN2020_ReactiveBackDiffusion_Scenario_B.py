@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-HALLORAN2020_ReactiveBackDiffusion_Scenario_A.py
+HALLORAN2020_ReactiveBackDiffusion_Scenario_B.py
 Landon Halloran, 2020
 www.ljsh.ca 
 github.com/lhalloran
 
-Python script to process and analyse model output for Scenario A in Halloran & Hunkeler (2020) paper.
+Python script to process and analyse model output for Scenario B in Halloran & Hunkeler (2020) paper.
 
 """
 
@@ -22,10 +22,11 @@ from matplotlib.colors import LogNorm
 #################################### TO BE DEFINED BY USER #######################################
 dropFactor = 1.0/10  # Attenuation factor (<1).
 cutOffC = 0.00001    # Cut-off normalised concentration (should be >=1E-5).
-pointNumber = 5 - 1  # Observation well for analysis. Starts at 0, moving L to R (i.e., well at 100m is # 4)
+pointNumber = 9      # Observation well for analysis. Above aquitard starts at 0, moving L to R (i.e., well at 100m is # 4)
+                     # Below aquitard starts at 5, moving L to R (i.e., well at 100m is # 9)
 ##################################################################################################
 
-#%% DEFINE CUJSTOM FUNCTIONS
+#%% DEFINE CUSTOM FUNCTIONS
 # text colour chooser
 def choose_colour(val,maxval):
     if np.isnan(val):
@@ -45,13 +46,13 @@ def to_velocity(K,epsilon,dHdx):
     return (1/epsilon)*K*dHdx
 
 #%% READ AND PRE-PROCESS DATA
-fileName = 'ScenarioA.csv'
+fileName = 'ScenarioB.csv'
 theFontSize=14
 plt.rcParams["font.weight"] = "bold"
 plt.rcParams["axes.labelweight"] = "bold"
 
 nt = 211 # number of time steps
-nPoints = 5
+nPoints = 10
 nParams = 6
 nParamsCombo = 288
 dHdx = 0.01 # horizontal hydraulic gradient 
