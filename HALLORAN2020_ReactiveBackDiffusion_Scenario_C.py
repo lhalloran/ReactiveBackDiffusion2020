@@ -71,7 +71,7 @@ for i in np.arange(nParamsCombo):
 #%% some general plotting parameters
 thefigsize=10,10
 
-#%% initial plots of data 
+#%% initial plots of data (note: these are not exported to pdf)
 xloc=np.arange(0,101,20)
 
 plt.figure()
@@ -90,30 +90,22 @@ plt.xlabel('time (years)')
 #%% determine spatial dependence at equilibrium (t = 1000 years)
 def expdec(x, b):
     return np.exp(-x/b)
-
 # Exponential decay parameter b (1 value per model run):
 equilExpParam=np.zeros((nParamsCombo))-1.0
 for i in np.arange(nParamsCombo):
     datanow = np.append(np.array(1),data[i,-1,:])
     pOpt, pCov = curve_fit(expdec, xloc, datanow, p0=(20))
     equilExpParam[i] = pOpt
-
-# Concentrations at equilibrium (at all 5 points):
-#CatEquil=np.zeros((nParamsCombo,nPoints))
-#for i in np.arange(nParamsCombo):
-#    datanow = data[i,-1,:]
-#    CatEquil[i,:] = datanow
-
-#%% Detm
+#%% As data time-step is not uniform, plot 
 
 def delayedExpRise(t, a, b, t0):
     return np.max([0,a*(1 - np.exp(-(t-t0)/b))])
 delayedExpRise_vec = np.vectorize(delayedExpRise) #vectorize so you can use func with array
 def delayedExpRise_vec_self(x,a,b,t0):
-  y = np.zeros(x.shape)
-  for i in range(len(y)):
-    y[i]=delayedExpRise(x[i],a,b,t0)
-  return y
+    y = np.zeros(x.shape)
+    for i in range(len(y)):
+        y[i]=delayedExpRise(x[i],a,b,t0)
+    return y
 
 temporalParams=np.zeros((nParamsCombo,nPoints,3))
 for n in np.arange(nPoints):
@@ -134,7 +126,6 @@ for n in np.arange(nPoints):
             print("# Error - curve_fit failed @ n="+str(n)+", i="+str(i))
             temporalParams[i,n,:] = [0,np.NaN,np.NaN]#3*[np.NaN]
 print('# Fits complete.')    
-
 xPoint = np.remainder(pointNumber,5)*20 + 20
 
 #%% prep for plots
