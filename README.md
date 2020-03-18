@@ -2,7 +2,7 @@
 
 This repository contains _python_ scripts related to the following paper:
 
-Halloran and Hunkeler (2020) "Controls on the persistence of aqueous-phase groundwater contaminants in the presence of reactive back-diffusion." _Science of the Total Environment_, 137749. https://doi.org/10.1016/j.scitotenv.2020.137749
+L.J.S. Halloran and D. Hunkeler (2020) "Controls on the persistence of aqueous-phase groundwater contaminants in the presence of reactive back-diffusion." _Science of the Total Environment_, 137749. https://doi.org/10.1016/j.scitotenv.2020.137749
 
 (A preprint version of the paper can be found in `journal_article/`.)
 
