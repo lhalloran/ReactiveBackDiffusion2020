@@ -5,7 +5,8 @@ Landon Halloran, 2020
 www.ljsh.ca 
 github.com/lhalloran
 
-Python script to process and analyse model output for Scenario C in Halloran & Hunkeler (2020) paper.
+Python script to process and analyse model output for Scenario C in the following paper:
+L.J.S. Halloran and D. Hunkeler (2020) "Controls on the persistence of aqueous-phase groundwater contaminants in the presence of reactive back-diffusion." _Science of the Total Environment_ **722C**, 137749. https://doi.org/10.1016/j.scitotenv.2020.137749
 
 """
 
