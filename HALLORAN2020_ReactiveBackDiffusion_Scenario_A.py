@@ -6,7 +6,10 @@ www.ljsh.ca
 github.com/lhalloran
 
 Python script to process and analyse model output for Scenario A in the following paper:
-L.J.S. Halloran and D. Hunkeler (2020) "Controls on the persistence of aqueous-phase groundwater contaminants in the presence of reactive back-diffusion." _Science of the Total Environment_ **722C**, 137749. https://doi.org/10.1016/j.scitotenv.2020.137749
+ L.J.S. Halloran and D. Hunkeler (2020) "Controls on the persistence of aqueous-phase 
+ groundwater contaminants in the presence of reactive back-diffusion." 
+ Science of the Total Environment 722, 137749. 
+ https://doi.org/10.1016/j.scitotenv.2020.137749
 
 """
 
