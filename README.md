@@ -1,10 +1,8 @@
 # ReactiveBackDiffusion2020
 
-This repository contains _python_ scripts related to the following paper:
+This repository contains _python_ scripts related to the following paper (_open access_):
 
 L.J.S. Halloran and D. Hunkeler (2020) "Controls on the persistence of aqueous-phase groundwater contaminants in the presence of reactive back-diffusion." _Science of the Total Environment_ **722**, 137749. https://doi.org/10.1016/j.scitotenv.2020.137749
-
-(A preprint version of the paper can be found in `journal_article/`.)
 
 ## Info
 These scripts process and visualise data exported from numerical models. In the contaminant transport models 5 parameters are varied. The script calculates and visualises maximum normalised concentrations, time (or n pore volumes) for attenuation, and plume extent. Constructed parameters (η, Π1 and Π2) are also calculated and various quantities are plotted against them. All plots are exported to a time-stamped pdf file in the subfolder `out/`.
