@@ -15,7 +15,7 @@ Three scenarios are tested. Each scenario has a different script.
 For Scenario A (aquifer between aquitards, contaminant source removed after fixed time) and Scenario B (aquitard between aquifers, contaminant source removed after fixed time), the following are defined by the user in the script: 
 * `dropFactor`: The attenuation factor as a multiple of the maximum normalised concentration (i.e., <1) below which the normalised concentration must fall to determine n_v,att.
 * `cutOffC`: A cut-off for normalised concentration below which results are ignored. Should be >1E-5 as this is the approximate precision of the numerical models.
-* `pointNumber`: to select the observation well for analysis. 0 is the well at 20m, 1 is the well at 40 m, etc. For Scenario B, the wells beloew the aquitard layer are numbered 5-9, moving left-to-right. In the article it is `pointNumber=4` that is presented.
+* `pointNumber`: to select the observation well for analysis. 0 is the well at 20m, 1 is the well at 40 m, etc. For Scenario B, the wells below the aquitard layer are numbered 5-9, moving left-to-right. In the article it is `pointNumber=4` that is presented.
 
 For Scenario C (aquifer between aquitards, constant contaminant source), only `cutOffC` and `pointNumber` need to be defined.
 
